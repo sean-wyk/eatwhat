@@ -104,21 +104,30 @@
     </style>
 </head>
 <body>
-
     <div id="container">
         <div id="result">点击下方按钮开始摇号</div>
         <button id="eatButton">吃什么</button>
     </div>
 
     <script>
-        // 定义食物列表
-        let foods = [];
-
         let isShaking = false;
         let shakeInterval;
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 从foods.json获取食物列表
+            // 创建 Web Worker
+            const worker = new Worker('worker.js');
+
+            // 监听来自 Worker 的消息
+            worker.onmessage = (e) => {
+                const { type, data } = e.data;
+                if (type === 'foodsLoaded') {
+                    window.foods = data;
+                } else if (type === 'randomFood') {
+                    updateResult(data);
+                }
+            };
+
+            // 从 foods.json 获取食物列表
             fetch('./foods.json')
                 .then(response => {
                     if (!response.ok) {
@@ -127,7 +136,7 @@
                     return response.json();
                 })
                 .then(data => {
-                    foods = data.foods;
+                    worker.postMessage({ type: 'loadFoods', data: data.foods });
                 })
                 .catch(error => {
                     document.getElementById('result').innerText = '无法加载食物列表';
@@ -137,15 +146,15 @@
             // 处理按钮点击事件
             document.getElementById('eatButton').addEventListener('click', () => {
                 if (isShaking) return; // 防止多次点击
-                if (foods.length === 0) {
+                if (!window.foods || window.foods.length === 0) {
                     document.getElementById('result').innerText = '食物列表为空';
                     return;
                 }
-                startShaking();
+                startShaking(worker);
             });
         });
 
-        function startShaking() {
+        function startShaking(worker) {
             isShaking = true;
             const resultDiv = document.getElementById('result');
             resultDiv.classList.add('shaking');
@@ -153,14 +162,26 @@
 
             let shakeCount = 0;
             const maxShakes = 20; // 摇动次数
-            shakeInterval = setInterval(() => {
-                const randomFood = foods[Math.floor(Math.random() * foods.length)];
-                resultDiv.innerText = randomFood;
-                shakeCount++;
-                if (shakeCount >= maxShakes) {
-                    stopShaking(randomFood);
+
+            function shake() {
+                if (shakeCount < maxShakes) {
+                    worker.postMessage({ type: 'getRandomFood' });
+                    shakeCount++;
+                    requestAnimationFrame(() => setTimeout(shake, 100));
+                } else {
+                    // 获取最终选择
+                    worker.postMessage({ type: 'getRandomFood' });
+                    // 监听一次最终选择
+                    worker.onmessage = (e) => {
+                        const { type, data } = e.data;
+                        if (type === 'randomFood') {
+                            stopShaking(data);
+                        }
+                    };
                 }
-            }, 100); // 每100毫秒更新一次
+            }
+
+            shake();
         }
 
         function stopShaking(finalChoice) {
@@ -171,6 +192,15 @@
             resultDiv.classList.add('fadeIn');
             resultDiv.innerText = `你可以吃：${finalChoice}`;
             document.getElementById('eatButton').disabled = false;
+        }
+
+        function updateResult(food) {
+            const resultDiv = document.getElementById('result');
+            if (isShaking) {
+                resultDiv.innerText = food;
+            } else {
+                resultDiv.innerText = `你可以吃：${food}`;
+            }
         }
     </script>
 </body>
