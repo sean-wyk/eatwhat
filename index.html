@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>吃什么</title>
+    <style>
+        /* 全局样式 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        #container {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            max-width: 400px;
+            margin: auto;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        #container:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.3);
+        }
+
+        #result {
+            font-size: 2em;
+            margin-bottom: 30px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+            transition: color 0.3s ease;
+        }
+
+        #eatButton {
+            padding: 15px 30px;
+            font-size: 1.5em;
+            cursor: pointer;
+            background: linear-gradient(45deg, #ff6b6b, #f06595);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            outline: none;
+        }
+
+        #eatButton:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        #eatButton:active {
+            transform: scale(0.95);
+            background: linear-gradient(45deg, #f06595, #ff6b6b);
+        }
+
+        /* 摇动动画 */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shaking {
+            animation: shake 0.5s infinite;
+        }
+
+        /* 结果出现动画 */
+        .fadeIn {
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="result">点击下方按钮开始摇号</div>
+        <button id="eatButton">吃什么</button>
+    </div>
+
+    <script>
+        // 定义食物列表
+        let foods = [];
+
+        let isShaking = false;
+        let shakeInterval;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 从foods.json获取食物列表
+            fetch('./foods.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应不正常');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    foods = data.foods;
+                })
+                .catch(error => {
+                    document.getElementById('result').innerText = '无法加载食物列表';
+                    console.error('加载foods.json失败:', error);
+                });
+
+            // 处理按钮点击事件
+            document.getElementById('eatButton').addEventListener('click', () => {
+                if (isShaking) return; // 防止多次点击
+                if (foods.length === 0) {
+                    document.getElementById('result').innerText = '食物列表为空';
+                    return;
+                }
+                startShaking();
+            });
+        });
+
+        function startShaking() {
+            isShaking = true;
+            const resultDiv = document.getElementById('result');
+            resultDiv.classList.add('shaking');
+            document.getElementById('eatButton').disabled = true;
+
+            let shakeCount = 0;
+            const maxShakes = 20; // 摇动次数
+            shakeInterval = setInterval(() => {
+                const randomFood = foods[Math.floor(Math.random() * foods.length)];
+                resultDiv.innerText = randomFood;
+                shakeCount++;
+                if (shakeCount >= maxShakes) {
+                    stopShaking(randomFood);
+                }
+            }, 100); // 每100毫秒更新一次
+        }
+
+        function stopShaking(finalChoice) {
+            clearInterval(shakeInterval);
+            isShaking = false;
+            const resultDiv = document.getElementById('result');
+            resultDiv.classList.remove('shaking');
+            resultDiv.classList.add('fadeIn');
+            resultDiv.innerText = `你可以吃：${finalChoice}`;
+            document.getElementById('eatButton').disabled = false;
+        }
+    </script>
+</body>
+</html>
