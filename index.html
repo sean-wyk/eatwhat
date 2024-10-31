@@ -103,7 +103,7 @@
         }
     </style>
 </head>
-<body>
+    <body>
     <div id="container">
         <div id="result">点击下方按钮开始摇号</div>
         <button id="eatButton">吃什么</button>
@@ -111,7 +111,6 @@
 
     <script>
         let isShaking = false;
-        let shakeInterval;
         let workerLoaded = false;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -122,8 +121,14 @@
             worker.onmessage = (e) => {
                 const { type, data } = e.data;
                 if (type === 'foodsLoaded') {
-                    console.log(`食物列表已加载，共有 ${data} 个食物项。`);
-                    workerLoaded = true;
+                    if (data > 0) {
+                        console.log(`食物列表已加载，共有 ${data} 个食物项。`);
+                        workerLoaded = true;
+                    } else {
+                        console.log('食物列表为空。');
+                        workerLoaded = false;
+                        document.getElementById('result').innerText = '食物列表为空';
+                    }
                 } else if (type === 'randomFood') {
                     updateResult(data);
                     if (!isShaking) {
@@ -142,7 +147,11 @@
                     return response.json();
                 })
                 .then(data => {
-                    worker.postMessage({ type: 'loadFoods', data: data.foods });
+                    if (data.foods && Array.isArray(data.foods)) {
+                        worker.postMessage({ type: 'loadFoods', data: data.foods });
+                    } else {
+                        throw new Error('foods.json 格式不正确');
+                    }
                 })
                 .catch(error => {
                     document.getElementById('result').innerText = '无法加载食物列表';
@@ -153,11 +162,7 @@
             document.getElementById('eatButton').addEventListener('click', () => {
                 if (isShaking) return; // 防止多次点击
                 if (!workerLoaded) {
-                    document.getElementById('result').innerText = '食物列表尚未加载';
-                    return;
-                }
-                if (workerLoaded && workerLoaded !== true) {
-                    document.getElementById('result').innerText = '食物列表为空';
+                    document.getElementById('result').innerText = '食物列表尚未加载或为空';
                     return;
                 }
                 startShaking(worker);
@@ -168,6 +173,7 @@
             isShaking = true;
             const resultDiv = document.getElementById('result');
             resultDiv.classList.add('shaking');
+            resultDiv.classList.remove('fadeIn');
             document.getElementById('eatButton').disabled = true;
 
             let shakeCount = 0;
@@ -179,7 +185,8 @@
                     shakeCount++;
                     setTimeout(shake, 100); // 每100毫秒摇动一次
                 } else {
-                    // 最后一次摇动后，等待 Worker 返回结果
+                    // 最后一次摇动后，重置 isShaking 并发送最终选择
+                    isShaking = false;
                     worker.postMessage({ type: 'getRandomFood' });
                 }
             }
@@ -188,7 +195,6 @@
         }
 
         function stopShaking(finalChoice) {
-            isShaking = false;
             const resultDiv = document.getElementById('result');
             resultDiv.classList.remove('shaking');
             resultDiv.classList.add('fadeIn');
