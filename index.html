@@ -112,6 +112,7 @@
     <script>
         let isShaking = false;
         let shakeInterval;
+        let workerLoaded = false;
 
         document.addEventListener('DOMContentLoaded', () => {
             // 创建 Web Worker
@@ -121,13 +122,18 @@
             worker.onmessage = (e) => {
                 const { type, data } = e.data;
                 if (type === 'foodsLoaded') {
-                    window.foods = data;
+                    console.log(`食物列表已加载，共有 ${data} 个食物项。`);
+                    workerLoaded = true;
                 } else if (type === 'randomFood') {
                     updateResult(data);
+                    if (!isShaking) {
+                        // 如果不是摇动过程中，停止摇动
+                        stopShaking(data);
+                    }
                 }
             };
 
-            // 从 foods.json 获取食物列表
+            // 从 foods.json 获取食物列表并发送给 Worker
             fetch('./foods.json')
                 .then(response => {
                     if (!response.ok) {
@@ -146,7 +152,11 @@
             // 处理按钮点击事件
             document.getElementById('eatButton').addEventListener('click', () => {
                 if (isShaking) return; // 防止多次点击
-                if (!window.foods || window.foods.length === 0) {
+                if (!workerLoaded) {
+                    document.getElementById('result').innerText = '食物列表尚未加载';
+                    return;
+                }
+                if (workerLoaded && workerLoaded !== true) {
                     document.getElementById('result').innerText = '食物列表为空';
                     return;
                 }
@@ -167,17 +177,10 @@
                 if (shakeCount < maxShakes) {
                     worker.postMessage({ type: 'getRandomFood' });
                     shakeCount++;
-                    requestAnimationFrame(() => setTimeout(shake, 100));
+                    setTimeout(shake, 100); // 每100毫秒摇动一次
                 } else {
-                    // 获取最终选择
+                    // 最后一次摇动后，等待 Worker 返回结果
                     worker.postMessage({ type: 'getRandomFood' });
-                    // 监听一次最终选择
-                    worker.onmessage = (e) => {
-                        const { type, data } = e.data;
-                        if (type === 'randomFood') {
-                            stopShaking(data);
-                        }
-                    };
                 }
             }
 
@@ -185,7 +188,6 @@
         }
 
         function stopShaking(finalChoice) {
-            clearInterval(shakeInterval);
             isShaking = false;
             const resultDiv = document.getElementById('result');
             resultDiv.classList.remove('shaking');
